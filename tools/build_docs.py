@@ -1,9 +1,11 @@
 """Turn data/ (written by fetch.py) into artifact-db documents + batch plan.
-usage: python tools/build_docs.py <repo_dir> <out_dir>
+usage: python tools/build_docs.py <repo_dir> <out_dir> [versions.json]
+versions.json = {"series/AAPL": 3, "market/quotes": 5, ...} (current db versions; needed to overwrite existing docs)
 out_dir/docs/<collection>__<doc_id>.json and out_dir/plan.json (list of batches)."""
 import json, os, sys, glob
 repo, out = sys.argv[1], sys.argv[2]
 os.makedirs(f"{out}/docs", exist_ok=True)
+vers = json.load(open(sys.argv[3])) if len(sys.argv) > 3 else {}
 docs = []
 quotes = json.load(open(f"{repo}/data/quotes.json"))
 for f in sorted(glob.glob(f"{repo}/data/prices/*.json")):
@@ -27,7 +29,9 @@ for col, did, d in docs:
     if len(s) > 250_000: print("WARN too big", did, len(s))
     if cur and (size + len(s) > 900_000 or len(cur) >= 45):
         plan.append(cur); cur, size = [], 0
-    cur.append({"collection": col, "doc_id": did, "file_path": p}); size += len(s)
+    w = {"op": "set", "collection": col, "doc_id": did, "file_path": p}
+    if f"{col}/{did}" in vers: w["if_version"] = vers[f"{col}/{did}"]
+    cur.append(w); size += len(s)
 if cur: plan.append(cur)
 json.dump(plan, open(f"{out}/plan.json", "w"), indent=1)
 print(f"{len(docs)} docs in {len(plan)} batches; quotes updated {quotes.get('updated')}")
