@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 import yfinance as yf
 
 OUT = "data"
+DEBUG = {"AAPL", "MC.PA"}
 os.makedirs(f"{OUT}/prices", exist_ok=True)
 
 def safe_id(sym):  # filename / db doc id
@@ -19,7 +20,16 @@ def num(x, nd=6):
 def news_items(t, sym):
     out = []
     try:
-        for n in (t.news or [])[:12]:
+        raw = []
+        try:
+            raw = t.get_news(count=12) or []
+        except Exception as e:
+            print("get_news err", sym, e, file=sys.stderr)
+        if not raw:
+            raw = t.news or []
+        if sym in DEBUG:
+            print("NEWSDEBUG", sym, len(raw), json.dumps(raw[:1], default=str)[:600])
+        for n in raw[:12]:
             c = n.get("content", n)
             title = c.get("title")
             if not title:
@@ -44,7 +54,9 @@ def main():
     meta, news, failed = {}, {}, []
     for s in syms:
         try:
-            df = hist[s].dropna(subset=["Close"])
+            df = hist[s].dropna(subset=["Close"]) if s in hist.columns.get_level_values(0) else None
+            if df is None or df.empty:
+                df = yf.download(s, period="5y", interval="1d", auto_adjust=True, progress=False, multi_level_index=False).dropna(subset=["Close"])
             if df.empty:
                 failed.append(s); continue
             rec = {"symbol": s, "d": [d.strftime("%Y-%m-%d") for d in df.index],
@@ -66,7 +78,7 @@ def main():
             last = rec["c"][-1]; prev = rec["c"][-2] if len(rec["c"]) > 1 else last
             if rec["ic"]:
                 last = rec["ic"][-1]
-            m = {"symbol": s, "id": safe_id(s), "name": info.get("shortName") or info.get("longName") or s,
+            m = {"symbol": s, "id": safe_id(s), "name": (info.get("shortName") or info.get("longName") or s).strip(),
                  "type": info.get("quoteType"), "currency": info.get("currency"), "exchange": info.get("exchange"),
                  "sector": info.get("sector"), "industry": info.get("industry"),
                  "mktCap": num(info.get("marketCap"), 0), "pe": num(info.get("trailingPE"), 2), "fpe": num(info.get("forwardPE"), 2),
