@@ -2,6 +2,38 @@
 import json, math, os, sys, time
 from datetime import datetime, timezone
 import yfinance as yf
+import urllib.request, urllib.parse, xml.etree.ElementTree as ET
+from email.utils import parsedate_to_datetime
+
+UA = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36"}
+
+def rss(url, sym, n=10):
+    out = []
+    try:
+        req = urllib.request.Request(url, headers=UA)
+        root = ET.fromstring(urllib.request.urlopen(req, timeout=15).read())
+        for it in root.iter("item"):
+            title = (it.findtext("title") or "").strip()
+            if not title:
+                continue
+            src = it.find("source")
+            pub = src.text if src is not None and src.text else None
+            if pub and title.endswith(" - " + pub):
+                title = title[: -len(pub) - 3]
+            ts = it.findtext("pubDate")
+            try:
+                ts = parsedate_to_datetime(ts).astimezone(timezone.utc).isoformat()
+            except Exception:
+                pass
+            out.append({"id": (it.findtext("guid") or title)[:120], "title": title, "summary": "",
+                        "publisher": pub or ("Yahoo Finance" if "yahoo" in url else None), "url": it.findtext("link"),
+                        "time": ts, "tickers": [sym]})
+            if len(out) >= n:
+                break
+    except Exception as e:
+        print("rss fail", sym, url[:60], e, file=sys.stderr)
+    return out
+
 
 OUT = "data"
 DEBUG = {"AAPL", "MC.PA"}
@@ -47,7 +79,18 @@ def news_items(t, sym):
                         "publisher": pub, "url": link, "time": ts, "tickers": [sym]})
     except Exception as e:
         print("news fail", sym, e, file=sys.stderr)
+    if not out:
+        out = rss("https://feeds.finance.yahoo.com/rss/2.0/headline?" + urllib.parse.urlencode({"s": sym, "region": "US", "lang": "en-US"}), sym)
+    if not out and NAMES.get(sym):
+        q = NAMES[sym] + (" bourse" if sym.endswith((".PA",)) else " stock")
+        hl = "fr" if sym.endswith(".PA") else "en-US"
+        gl = "FR" if sym.endswith(".PA") else "US"
+        out = rss("https://news.google.com/rss/search?" + urllib.parse.urlencode({"q": q + " when:7d", "hl": hl, "gl": gl, "ceid": f"{gl}:{hl.split('-')[0]}"}), sym, 8)
+    if sym in DEBUG:
+        open(f"{OUT}/debug_{sym}.txt", "a").write(f"\nfinal {len(out)}")
     return out
+
+NAMES = {}
 
 def main():
     wl = json.load(open("watchlist.json"))["tickers"]
@@ -93,6 +136,7 @@ def main():
             rec["meta"] = m
             json.dump(rec, open(f"{OUT}/prices/{safe_id(s)}.json", "w"), separators=(",", ":"))
             meta[s] = m
+            NAMES[s] = m["name"] if m["name"] != s else None
             for n in news_items(t, s):
                 if n["id"] in news:
                     news[n["id"]]["tickers"].append(s)
