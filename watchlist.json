@@ -1,0 +1,12 @@
+{
+  "tickers": [
+    "^GSPC","^NDX","^STOXX50E","^FCHI","^GDAXI","^FTSE","^N225","^VIX",
+    "SPY","QQQ","IWM","TLT","HYG",
+    "AAPL","MSFT","NVDA","AMZN","GOOGL","META","TSLA","JPM","GS",
+    "MC.PA","TTE.PA","BNP.PA","GLE.PA","AIR.PA","SAN.PA","ASML.AS","SAP.DE",
+    "EURUSD=X","GBPUSD=X","USDJPY=X","EURGBP=X",
+    "^TNX","^IRX","^FVX","^TYX",
+    "CL=F","BZ=F","NG=F","GC=F","HG=F",
+    "BTC-USD","ETH-USD"
+  ]
+}
