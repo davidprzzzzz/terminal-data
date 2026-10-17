@@ -36,7 +36,7 @@ def rss(url, sym, n=10):
 
 
 OUT = "data"
-DEBUG = {"AAPL", "MC.PA"}
+DEBUG = set()
 os.makedirs(f"{OUT}/prices", exist_ok=True)
 
 def safe_id(sym):  # filename / db doc id
@@ -138,10 +138,12 @@ def main():
             meta[s] = m
             NAMES[s] = m["name"] if m["name"] != s else None
             for n in news_items(t, s):
-                if n["id"] in news:
-                    news[n["id"]]["tickers"].append(s)
+                key = " ".join((n["title"] or "").lower().split())[:90]
+                if key in news:
+                    if s not in news[key]["tickers"]:
+                        news[key]["tickers"].append(s)
                 else:
-                    news[n["id"]] = n
+                    news[key] = n
             time.sleep(0.2)
         except Exception as e:
             print("fail", s, e, file=sys.stderr); failed.append(s)
