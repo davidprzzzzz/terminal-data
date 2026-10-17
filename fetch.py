@@ -25,10 +25,14 @@ def news_items(t, sym):
             raw = t.get_news(count=12) or []
         except Exception as e:
             print("get_news err", sym, e, file=sys.stderr)
+            if sym in DEBUG:
+                open(f"{OUT}/debug_err_{sym}.txt", "w").write(repr(e))
         if not raw:
             raw = t.news or []
         if sym in DEBUG:
             print("NEWSDEBUG", sym, len(raw), json.dumps(raw[:1], default=str)[:600])
+            with open(f"{OUT}/debug_{sym}.txt", "w") as fh:
+                fh.write(f"{yf.__version__} {len(raw)}\n" + json.dumps(raw[:2], default=str)[:3000])
         for n in raw[:12]:
             c = n.get("content", n)
             title = c.get("title")
